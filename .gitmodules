@@ -1,0 +1,10 @@
+[submodule "triton"]
+	path = triton
+	url = https://github.com/JonathanSalwan/Triton
+	shallow = true
+	ignore = dirty
+[submodule "libvmi"]
+	path = libvmi
+	url = https://github.com/libvmi/libvmi
+	shallow = true
+	ignore = dirty
