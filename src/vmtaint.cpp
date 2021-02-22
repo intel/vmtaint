@@ -114,7 +114,7 @@ static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, ui
     return read;
 }
 
-static void process_pt(const char *pt)
+static void process_pt(const char *pt, bool skip_userspace)
 {
     struct pt_config config;
     pt_config_init(&config);
@@ -187,7 +187,8 @@ static void process_pt(const char *pt)
             printf("\n");
             */
 
-            run_taint(insn.ip, (const unsigned char*)&insn.raw, l);
+            if ( !skip_userspace || insn.ip >= KERNEL_64 )
+                run_taint(insn.ip, (const unsigned char*)&insn.raw, l);
 
             if ( s < 0 )
                 break;
@@ -230,7 +231,6 @@ int main(int argc, char *const *argv)
     const char* statefile;
     const char* pt = NULL;
     const char* json = NULL;
-    std::string line;
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
     {
@@ -305,7 +305,7 @@ int main(int argc, char *const *argv)
     for (int i = 0; i < taint_size; i++ )
         triton_api.taintMemory(taint_address + i);
 
-    process_pt(pt);
+    process_pt(pt, skip_userspace);
 
     return 0;
 }
