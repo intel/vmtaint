@@ -35,3 +35,22 @@ autoreconf -vif
 ./configure
 make
 ```
+
+# Collect IPT log:
+
+```
+xl pause <domid>
+vmtaint --save-state state.log --domid <domid>
+(timeout -s 2 10 xen-vmtrace <domid> 0 > vmtrace.log &) && xl unpause <domid>
+```
+
+# Run vmtaint:
+
+```
+vmtaint \
+    --load-state state.log \
+    --pt vmtrace.log \
+    --domid <domid> \
+    --taint-address <virtual address> \
+    --taint-size <taint size>
+```
