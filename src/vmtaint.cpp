@@ -20,6 +20,7 @@ triton::API triton_api;
 static vmi_instance_t vmi;
 addr_t kpgd;
 #define KERNEL_64 0xffffffff80000000ULL
+#define CHUNK_SIZE 1000000UL //10m
 
 static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
 {
@@ -50,9 +51,6 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
     }
 }
 
-/*
- * TODO: save the regs in json or some other sane format
- */
 static bool save_state(uint64_t domid, const char *filepath)
 {
     registers_t regs = {0};
@@ -115,6 +113,70 @@ static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, ui
     return read;
 }
 
+static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, bool skip_userspace)
+{
+    struct pt_insn_decoder *decoder = pt_insn_alloc_decoder(config);
+    pt_insn_set_image(decoder, image);
+    bool ret = false;
+    int s;
+
+    struct pt_insn insn = {0};
+    if ( (s = pt_insn_sync_set(decoder, 0)) < 0 )
+        goto done;
+
+    while ( true )
+    {
+        while ( s & pts_event_pending )
+        {
+            struct pt_event event;
+
+            s = pt_insn_event(decoder, &event, sizeof(event));
+            if ( s < 0 )
+                goto done;
+        }
+
+        s = pt_insn_next(decoder, &insn, sizeof(insn));
+        if ( s < 0 && !insn.iclass )
+            continue;
+
+        int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
+
+            /*
+            printf("0x%lx %u", insn.ip, insn.size);
+            for (int i = 0; i < l; i++)
+                printf(" %02x", insn.raw[i]);
+            printf("\n");
+            */
+
+        if ( !skip_userspace || insn.ip >= KERNEL_64 )
+            run_taint(insn.ip, (const unsigned char*)&insn.raw, l);
+
+        if ( s < 0 )
+            goto done;
+    }
+
+    ret = true;
+
+done:
+    pt_insn_free_decoder(decoder);
+    return ret;
+}
+
+static unsigned long find_last_sync_point(struct pt_config *config, struct pt_image *image)
+{
+    struct pt_insn_decoder *decoder = pt_insn_alloc_decoder(config);
+    pt_insn_set_image(decoder, image);
+
+    unsigned long sync_point = ~0ul;
+
+    while ( pt_insn_sync_forward(decoder) >= 0 )
+        pt_insn_get_sync_offset(decoder, &sync_point);
+
+    pt_insn_free_decoder(decoder);
+
+    return sync_point;
+}
+
 static inline void pt_cpu_init(struct pt_cpu *cpu)
 {
     uint32_t eax = 0, ebx, ecx, edx;
@@ -131,6 +193,7 @@ static void process_pt(const char *pt, bool skip_userspace)
 {
     unsigned long processed = 0;
     struct pt_config config;
+
     pt_config_init(&config);
     pt_cpu_init(&config.cpu);
 
@@ -142,80 +205,52 @@ static void process_pt(const char *pt, bool skip_userspace)
         return;
 
     fseek(ptf, 0, SEEK_END);
-    long size = ftell(ptf);
+    unsigned long size = ftell(ptf);
     fseek(ptf, 0, SEEK_SET);
 
-    uint8_t *ptbuf = (uint8_t*)malloc(size);
+    uint8_t *ptbuf = (uint8_t*)malloc(CHUNK_SIZE);
     if ( !ptbuf ) {
         fclose(ptf);
         return;
     }
 
-    if ( !(size = fread(ptbuf, 1, size, ptf)) )
-    {
-        fclose(ptf);
-        free(ptbuf);
-        return;
-    }
-
-    fclose(ptf);
-
     config.begin = ptbuf;
-    config.end = ptbuf + size;
 
-    struct pt_image *pt_image = pt_image_alloc(NULL);
-    struct pt_insn_decoder *decoder = pt_insn_alloc_decoder(&config);
+    struct pt_image *image = pt_image_alloc(NULL);
+    pt_image_set_callback(image, read_mem, NULL);
 
-    pt_image_set_callback(pt_image, read_mem, NULL);
-    pt_insn_set_image(decoder, pt_image);
-
-    while ( true )
+    while ( processed < size )
     {
-        struct pt_insn insn = {0};
-        int s = pt_insn_sync_forward(decoder);
-        if ( s == -pte_eos)
+        memset(ptbuf, 0, CHUNK_SIZE);
+
+        fseek(ptf, processed, SEEK_SET);
+
+        if ( !(size = fread(ptbuf, 1, CHUNK_SIZE, ptf)) )
             break;
-        if ( s < 0 )
-            continue;
 
-        while ( true )
+        config.end = ptbuf + size;
+
+        unsigned long last_sync = find_last_sync_point(&config, image);
+
+        if ( last_sync == ~0ul )
+            break;
+
+        if ( last_sync )
         {
-            while ( s & pts_event_pending )
-            {
-                struct pt_event event;
-
-                s = pt_insn_event(decoder, &event, sizeof(event));
-                if ( s < 0 )
-                    break;
-            }
-
-            if ( s < 0 )
-                break;
-
-            s = pt_insn_next(decoder, &insn, sizeof(insn));
-            if ( s < 0 && !insn.iclass )
-                continue;
-
-            int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
-
-            /*
-            printf("0x%lx %u", insn.ip, insn.size);
-            for (int i = 0; i < l; i++)
-                printf(" %02x", insn.raw[i]);
-            printf("\n");
-            */
-
-            if ( !skip_userspace || insn.ip >= KERNEL_64 )
-                run_taint(insn.ip, (const unsigned char*)&insn.raw, l);
-
-            if ( s < 0 )
-                break;
+            config.end = ptbuf + last_sync;
+            processed += last_sync;
+        } else {
+            config.end = ptbuf + size;
+            processed += size;
         }
+
+        if ( !process_pt_chunk(&config, image, skip_userspace) )
+            break;
     }
 
-    pt_insn_free_decoder(decoder);
-    pt_image_free(pt_image);
+    pt_image_free(image);
     free(ptbuf);
+    fclose(ptf);
 }
 
 static void usage(void)
