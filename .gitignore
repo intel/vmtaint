@@ -1,0 +1,16 @@
+stamp-h1
+*.o
+*.Po
+aclocal.m4
+autom4te.cache
+config*
+Makefile
+Makefile.in
+vmtaint
+src/.deps
+src/.dirstamp
+libtool
+ltmain.sh
+**/*.m4
+**/*.a
+**/*.la

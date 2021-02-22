@@ -175,10 +175,10 @@ static void process_pt(const char *pt, bool skip_userspace)
                 break;
 
             s = pt_insn_next(decoder, &insn, sizeof(insn));
-            if ( s < 0 && insn.iclass == ptic_unknown )
+            if ( s < 0 && !insn.iclass )
                 continue;
 
-	       int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
+            int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
 
             /*
             printf("0x%lx %u", insn.ip, insn.size);
