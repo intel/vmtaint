@@ -14,6 +14,7 @@ AC_LANG(C++)
 
 AC_CHECK_HEADERS([triton/api.hpp], [], [AC_MSG_ERROR(No triton headers found)])
 
+LDFLAGS="$LDFALGS -ltriton"
 AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([#include <triton/api.hpp>
                       using namespace triton;],
@@ -22,8 +23,6 @@ AC_LINK_IFELSE(
 )
 
 PKG_CHECK_MODULES([VMI], [libvmi],[],[AC_MSG_ERROR(LibVMI not found. Install missing package and re-run)])
-PKG_CHECK_MODULES([CAPSTONE], [capstone >= 4.0.2],[],[AC_MSG_ERROR(Capstone not found. Install missing package and re-run)])
-PKG_CHECK_MODULES([GLIB], [glib-2.0],[],[AC_MSG_ERROR(glib-2.0 not found. Install missing package and re-run)])
 AC_CHECK_HEADERS([intel-pt.h], [], [AC_MSG_ERROR([intel-pt.h not usable. Install missing package and re-run])])
 AC_CHECK_LIB(ipt, pt_insn_set_image, [], [AC_MSG_ERROR([libipt not found])])
 
