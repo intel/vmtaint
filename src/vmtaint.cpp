@@ -225,9 +225,9 @@ int main(int argc, char *const *argv)
     uint64_t domid = 0;
     addr_t taint_address = 0;
     size_t taint_size = 0;
-	bool save = false;
+    bool save = false;
     bool skip_userspace = false;
-	const char* statefile;
+    const char* statefile;
     const char* pt = NULL;
     const char* json = NULL;
     std::string line;
@@ -245,11 +245,11 @@ int main(int argc, char *const *argv)
         case 'T':
             taint_size = atoi(optarg);
             break;
-		case 's':
+        case 's':
             save = true;
             statefile = optarg;
             break;
-		case 'l':
+        case 'l':
             statefile = optarg;
             break;
         case 'p':
