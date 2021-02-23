@@ -98,7 +98,7 @@ static void load_state(const char *filepath)
 
 static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
 {
-    addr_t cr3 = ip >= KERNEL_64 || asid->cr3 == -1 ? kpgd : asid->cr3;;
+    addr_t cr3 = kpgd && (ip >= KERNEL_64 || asid->cr3 == -1) ? kpgd : asid->cr3;;
 
     size_t read = 0;
     access_context_t ctx = {
@@ -313,7 +313,8 @@ int main(int argc, char *const *argv)
     {
         vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL);
         vmi_get_offset(vmi, "kpgd", &kpgd);
-    }
+    } else
+        vmi_init_paging(vmi, 0);
 
     triton_api.setArchitecture(ARCH_X86_64);
     triton_api.enableTaintEngine(1);
