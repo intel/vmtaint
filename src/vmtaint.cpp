@@ -9,6 +9,7 @@
 #include <intel-pt.h>
 #include <libvmi/libvmi.h>
 #include <getopt.h>
+#include <cpuid.h>
 
 using namespace std;
 using namespace triton;
@@ -114,10 +115,27 @@ static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, ui
     return read;
 }
 
+static inline void pt_cpu_init(struct pt_cpu *cpu)
+{
+    uint32_t eax = 0, ebx, ecx, edx;
+
+    __get_cpuid(1u, &eax, &ebx, &ecx, &edx);
+
+    cpu->family = ((eax >> 8) & 0xf) | ((eax >> 20) & 0xf);
+    cpu->model = ((eax >> 4) & 0xf) | ((eax >> 12) & 0xf0);
+    cpu->stepping = eax & 0xf;
+    cpu->vendor = pcv_intel;
+}
+
 static void process_pt(const char *pt, bool skip_userspace)
 {
+    unsigned long processed = 0;
     struct pt_config config;
     pt_config_init(&config);
+    pt_cpu_init(&config.cpu);
+
+    if ( pt_cpu_errata(&config.errata, &config.cpu) < 0 )
+        return;
 
     FILE *ptf = fopen(pt, "r");
     if (!ptf)
