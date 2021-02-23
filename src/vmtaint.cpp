@@ -229,10 +229,11 @@ static void process_pt(const char *pt, bool skip_userspace)
 
         fseek(ptf, processed, SEEK_SET);
 
-        if ( !(size = fread(ptbuf, 1, CHUNK_SIZE, ptf)) )
+        unsigned long read;
+        if ( !(read = fread(ptbuf, 1, CHUNK_SIZE, ptf)) )
             break;
 
-        config.end = ptbuf + size;
+        config.end = ptbuf + read;
 
         unsigned long last_sync = find_last_sync_point(&config, image);
 
@@ -244,8 +245,8 @@ static void process_pt(const char *pt, bool skip_userspace)
             config.end = ptbuf + last_sync;
             processed += last_sync;
         } else {
-            config.end = ptbuf + size;
-            processed += size;
+            config.end = ptbuf + read;
+            processed += read;
         }
 
         if ( !process_pt_chunk(&config, image, skip_userspace) )
