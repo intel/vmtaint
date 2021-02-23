@@ -51,9 +51,10 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
     }
 }
 
-static bool save_state(uint64_t domid, const char *filepath)
+static bool save_state(const char *filepath)
 {
-    registers_t regs = {0};
+    registers_t regs;
+    memset(&regs, 0, sizeof(regs));
 
     vmi_get_vcpuregs(vmi, &regs, 0);
 
@@ -66,7 +67,8 @@ static bool save_state(uint64_t domid, const char *filepath)
 
 static void load_state(const char *filepath)
 {
-    x86_registers_t regs = {0};
+    x86_registers_t regs;
+    memset(&regs, 0, sizeof(regs));
 
     FILE *i = fopen(filepath, "r");
     fread(&regs, 1, sizeof(x86_registers_t), i);
@@ -96,7 +98,7 @@ static void load_state(const char *filepath)
 
 static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
 {
-    addr_t cr3 = kpgd && (ip >= KERNEL_64 || asid->cr3 == -1) ? kpgd : asid->cr3;;
+    addr_t cr3 = kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull) ? kpgd : asid->cr3;;
 
     size_t read = 0;
     access_context_t ctx = {
@@ -119,13 +121,15 @@ static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, b
     pt_insn_set_image(decoder, image);
     bool ret = false;
     int s;
+    struct pt_insn insn;
 
-    struct pt_insn insn = {0};
     if ( (s = pt_insn_sync_set(decoder, 0)) < 0 )
         goto done;
 
     while ( true )
     {
+        memset(&insn, 0, sizeof(insn));
+
         while ( s & pts_event_pending )
         {
             struct pt_event event;
@@ -339,7 +343,7 @@ int main(int argc, char *const *argv)
     if ( save )
     {
         printf("Saving state\n");
-        save_state(domid, statefile);
+        save_state(statefile);
         vmi_destroy(vmi);
         return 0;
     }
@@ -356,7 +360,7 @@ int main(int argc, char *const *argv)
 
     load_state(statefile);
 
-    for (int i = 0; i < taint_size; i++ )
+    for (unsigned int i = 0; i < taint_size; i++ )
         triton_api.taintMemory(taint_address + i);
 
     process_pt(pt, skip_userspace);
