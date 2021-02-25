@@ -358,6 +358,7 @@ int main(int argc, char *const *argv)
 
     triton_api.setArchitecture(ARCH_X86_64);
     triton_api.enableTaintEngine(1);
+    triton_api.enableSymbolicEngine(0);
 
     load_state(statefile);
 
