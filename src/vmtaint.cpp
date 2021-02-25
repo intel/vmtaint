@@ -26,28 +26,34 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
 {
     Instruction inst;
 
-    inst.setOpcode(buf, size);
-    inst.setAddress(ip);
-
-    triton_api.processing(inst);
-
     cout << std::hex << ip << "\t";
-    cout << inst.getDisassembly() << endl;
 
-    /*
-    std::unordered_set<triton::uint64> tainted_mem = triton_api.getTaintedMemory();
+    try {
+        inst.setOpcode(buf, size);
+        inst.setAddress(ip);
+        triton_api.processing(inst);
+        cout << inst.getDisassembly() << endl;
 
-    for (auto itr = tainted_mem.begin(); itr != tainted_mem.end(); ++itr)
-        std::cout << "\t Tainted mem: " << std::hex << *itr << endl;
-    */
+        /*
+        std::unordered_set<triton::uint64> tainted_mem = triton_api.getTaintedMemory();
 
-    std::unordered_set<const triton::arch::Register *> tainted_regs = triton_api.getTaintedRegisters();
+        for (auto itr = tainted_mem.begin(); itr != tainted_mem.end(); ++itr)
+            std::cout << "\t Tainted mem: " << std::hex << *itr << endl;
+        */
 
-    for (auto itr = tainted_regs.begin(); itr != tainted_regs.end(); ++itr)
-    {
-        const triton::arch::Register *reg = *itr;
-        if ( (*itr)->getId() != ID_REG_INVALID && (*itr)->getSize() )
-            std::cout << "\t Tainted reg: " << reg->getName() << ": " << hex << triton_api.getConcreteRegisterValue(*reg) << endl;
+        std::unordered_set<const triton::arch::Register *> tainted_regs = triton_api.getTaintedRegisters();
+
+        for (auto itr = tainted_regs.begin(); itr != tainted_regs.end(); ++itr)
+        {
+            const triton::arch::Register *reg = *itr;
+            if ( (*itr)->getId() != ID_REG_INVALID && (*itr)->getSize() )
+                std::cout << "\t Tainted reg: " << reg->getName() << ": " << hex << triton_api.getConcreteRegisterValue(*reg) << endl;
+        }
+    } catch (...) {
+        cout << "error running taint on instruction ";
+        for (int i = 0; i < size; i++)
+             printf(" %02x", buf[i]);
+        cout << endl;
     }
 }
 
@@ -148,10 +154,6 @@ static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, b
         int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
 
             /*
-            printf("0x%lx %u", insn.ip, insn.size);
-            for (int i = 0; i < l; i++)
-                printf(" %02x", insn.raw[i]);
-            printf("\n");
             */
 
         if ( !skip_userspace || insn.ip >= KERNEL_64 )
