@@ -20,7 +20,7 @@ triton::API triton_api;
 static vmi_instance_t vmi;
 addr_t kpgd;
 #define KERNEL_64 0xffffffff80000000ULL
-#define CHUNK_SIZE 1000000UL //10m
+#define CHUNK_SIZE 10000000UL //10m
 
 static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
 {
@@ -119,12 +119,14 @@ static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, b
 {
     struct pt_insn_decoder *decoder = pt_insn_alloc_decoder(config);
     pt_insn_set_image(decoder, image);
-    bool ret = false;
     int s;
     struct pt_insn insn;
 
     if ( (s = pt_insn_sync_set(decoder, 0)) < 0 )
-        goto done;
+    {
+        pt_insn_free_decoder(decoder);
+        return false;
+    }
 
     while ( true )
     {
@@ -141,7 +143,7 @@ static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, b
 
         s = pt_insn_next(decoder, &insn, sizeof(insn));
         if ( s < 0 && !insn.iclass )
-            continue;
+            break;
 
         int l = insn.size > sizeof(insn.raw) ? sizeof(insn.raw) : insn.size;
 
@@ -154,16 +156,11 @@ static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, b
 
         if ( !skip_userspace || insn.ip >= KERNEL_64 )
             run_taint(insn.ip, (const unsigned char*)&insn.raw, l);
-
-        if ( s < 0 )
-            goto done;
     }
-
-    ret = true;
 
 done:
     pt_insn_free_decoder(decoder);
-    return ret;
+    return true;
 }
 
 static unsigned long find_last_sync_point(struct pt_config *config, struct pt_image *image)
