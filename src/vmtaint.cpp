@@ -65,18 +65,24 @@ static bool save_state(const char *filepath)
     vmi_get_vcpuregs(vmi, &regs, 0);
 
     FILE *i = fopen(filepath, "w+");
-	fwrite(&regs, sizeof(regs), 1, i);
-	fclose(i);
+    if ( !i )
+        return false;
+
+    fwrite(&regs, sizeof(regs), 1, i);
+    fclose(i);
 
     return true;
 }
 
-static void load_state(const char *filepath)
+static bool load_state(const char *filepath)
 {
     x86_registers_t regs;
     memset(&regs, 0, sizeof(regs));
 
     FILE *i = fopen(filepath, "r");
+    if ( !i )
+        return false;
+
     fread(&regs, 1, sizeof(x86_registers_t), i);
 	fclose(i);
 
@@ -100,6 +106,8 @@ static void load_state(const char *filepath)
     triton_api.setConcreteRegisterValue(triton_api.getRegister("eflags"), regs.rflags);
     triton_api.setConcreteRegisterValue(triton_api.getRegister("fs"), regs.fs_base);
     triton_api.setConcreteRegisterValue(triton_api.getRegister("gs"), regs.fs_base);
+
+    return true;
 }
 
 static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
@@ -261,7 +269,17 @@ static void usage(void)
 {
     printf("Usage:\n");
     printf("\t --domid <domid>\n");
+    printf("\t --taint <address[:size]>\n");
+    printf("\t --save-state <file>\n");
+    printf("\t --load-state <file>\n");
+    printf("\t --json <file>\n");
+    printf("\t --skip-userspace>\n");
 }
+
+struct taint_address {
+    addr_t address;
+    size_t size;
+};
 
 int main(int argc, char *const *argv)
 {
@@ -270,8 +288,7 @@ int main(int argc, char *const *argv)
     const struct option long_opts[] =
     {
         {"domid", required_argument, NULL, 'd'},
-        {"taint-address", required_argument, NULL, 't'},
-        {"taint-size", required_argument, NULL, 'T'},
+        {"taint", required_argument, NULL, 't'},
         {"save-state", required_argument, NULL, 's'},
         {"load-state", required_argument, NULL, 'l'},
         {"pt", required_argument, NULL, 'p'},
@@ -279,15 +296,14 @@ int main(int argc, char *const *argv)
         {"skip-userspace", no_argument, NULL, 'u'},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "d:t:T:s:l:u";
+    const char* opts = "d:t:s:l:p:j:u";
     uint64_t domid = 0;
-    addr_t taint_address = 0;
-    size_t taint_size = 0;
     bool save = false;
     bool skip_userspace = false;
     const char* statefile;
     const char* pt = NULL;
     const char* json = NULL;
+    vector<struct taint_address> taint_addresses;
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
     {
@@ -297,11 +313,15 @@ int main(int argc, char *const *argv)
             domid = strtoull(optarg, NULL, 0);
             break;
         case 't':
-            taint_address = strtoull(optarg, NULL, 0);
+        {
+            string s(optarg);
+            size_t pos = s.find(":");
+            addr_t address = strtoull(s.substr(0, pos).c_str(), NULL, 0);
+            size_t size = pos ? strtoull(s.substr(pos+1, s.length()).c_str(), NULL, 0) : 1;
+
+            taint_addresses.push_back({address, size});
             break;
-        case 'T':
-            taint_size = atoi(optarg);
-            break;
+        }
         case 's':
             save = true;
             statefile = optarg;
@@ -359,12 +379,22 @@ int main(int argc, char *const *argv)
     triton_api.enableTaintEngine(1);
     triton_api.enableSymbolicEngine(0);
 
-    load_state(statefile);
+    if ( !load_state(statefile) )
+    {
+        vmi_destroy(vmi);
+        return -1;
+    }
 
-    for (unsigned int i = 0; i < taint_size; i++ )
-        triton_api.taintMemory(taint_address + i);
+    for (unsigned int i = 0; i < taint_addresses.size(); i++)
+    {
+        cout << "Tainting memory at 0x" << hex << taint_addresses[i].address << " + " << taint_addresses[i].size << endl;
+        for (unsigned int s = 0; s < taint_addresses[i].size; s++ )
+            triton_api.taintMemory(taint_addresses[i].address + s);
+    }
 
     process_pt(pt, skip_userspace);
+
+    vmi_destroy(vmi);
 
     return 0;
 }
