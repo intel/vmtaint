@@ -18,7 +18,7 @@ using namespace triton::arch::x86;
 triton::API triton_api;
 
 static vmi_instance_t vmi;
-addr_t kpgd;
+static addr_t kpgd;
 #define KERNEL_64 0xffffffff80000000ULL
 #define CHUNK_SIZE 10000000UL //10m
 
@@ -26,7 +26,7 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
 {
     Instruction inst;
 
-    cout << std::hex << ip << "\t";
+    cout << hex << ip << "\t";
 
     try {
         inst.setOpcode(buf, size);
@@ -35,19 +35,19 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
         cout << inst.getDisassembly() << endl;
 
         /*
-        std::unordered_set<triton::uint64> tainted_mem = triton_api.getTaintedMemory();
+        unordered_set<triton::uint64> tainted_mem = triton_api.getTaintedMemory();
 
         for (auto itr = tainted_mem.begin(); itr != tainted_mem.end(); ++itr)
-            std::cout << "\t Tainted mem: " << std::hex << *itr << endl;
+            cout << "\t Tainted mem: " << hex << *itr << endl;
         */
 
-        std::unordered_set<const triton::arch::Register *> tainted_regs = triton_api.getTaintedRegisters();
+        unordered_set<const triton::arch::Register *> tainted_regs = triton_api.getTaintedRegisters();
 
         for (auto itr = tainted_regs.begin(); itr != tainted_regs.end(); ++itr)
         {
             const triton::arch::Register *reg = *itr;
             if ( (*itr)->getId() != ID_REG_INVALID && (*itr)->getSize() )
-                std::cout << "\t Tainted reg: " << reg->getName() << ": " << hex << triton_api.getConcreteRegisterValue(*reg) << endl;
+                cout << "\t Tainted reg: " << reg->getName() << ": " << hex << triton_api.getConcreteRegisterValue(*reg) << endl;
         }
     } catch (...) {
         cout << "error running taint on instruction ";
@@ -83,8 +83,11 @@ static bool load_state(const char *filepath)
     if ( !i )
         return false;
 
-    fread(&regs, 1, sizeof(x86_registers_t), i);
+    size_t read = fread(&regs, 1, sizeof(x86_registers_t), i);
 	fclose(i);
+
+    if ( read != sizeof(x86_registers_t) )
+        return false;
 
     triton_api.setConcreteRegisterValue(triton_api.getRegister("rax"), regs.rax);
     triton_api.setConcreteRegisterValue(triton_api.getRegister("rbx"), regs.rbx);
@@ -115,11 +118,11 @@ static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, ui
     addr_t cr3 = kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull) ? kpgd : asid->cr3;;
 
     size_t read = 0;
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .addr = ip,
-        .dtb = cr3
-    };
+    access_context_t ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = ip;
+    ctx.dtb = cr3;
 
     vmi_read(vmi, &ctx, size, buffer, &read);
 
@@ -300,7 +303,7 @@ int main(int argc, char *const *argv)
     uint64_t domid = 0;
     bool save = false;
     bool skip_userspace = false;
-    const char* statefile;
+    const char* statefile = NULL;
     const char* pt = NULL;
     const char* json = NULL;
     vector<struct taint_address> taint_addresses;
@@ -368,9 +371,8 @@ int main(int argc, char *const *argv)
         return 0;
     }
 
-    if ( json )
+    if ( json && VMI_OS_UNKNOWN != vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL) )
     {
-        vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL);
         vmi_get_offset(vmi, "kpgd", &kpgd);
     } else
         vmi_init_paging(vmi, 0);
