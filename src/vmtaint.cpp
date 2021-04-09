@@ -270,12 +270,17 @@ static void process_pt(const char *pt, bool skip_userspace)
 static void usage(void)
 {
     printf("Usage:\n");
+    printf("Step 1:\n");
     printf("\t --domid <domid>\n");
-    printf("\t --taint <address[:size]>\n");
-    printf("\t --save-state <file>\n");
-    printf("\t --load-state <file>\n");
+    printf("\t --save-state <file>\n\n");
+
+    printf("Step 2:\n");
+    printf("\t --domid <domid>\n");
+    printf("\t --load-state <file>\n\n");
+    printf("\t --taint <address[:size]> (can be specified multiple times)\n");
+    printf("\t --pt <file>\n");
     printf("\t --json <file>\n");
-    printf("\t --skip-userspace>\n");
+    printf("\t --skip-userspace (optional)\n");
 }
 
 struct taint_address {
@@ -364,7 +369,7 @@ int main(int argc, char *const *argv)
 
     if ( save )
     {
-        printf("Saving state\n");
+        cout << "Saving state" << endl;
         save_state(statefile);
         vmi_destroy(vmi);
         return 0;
