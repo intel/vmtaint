@@ -115,12 +115,11 @@ static bool load_state(const char *filepath)
 
 static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
 {
-    addr_t cr3 = kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull) ? kpgd : asid->cr3;;
+    addr_t cr3 = (kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull)) ? kpgd : asid->cr3;;
 
     size_t read = 0;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(ctx));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ACCESS_CONTEXT(ctx);
+    ctx.tm = VMI_TM_PROCESS_DTB;
     ctx.addr = ip;
     ctx.dtb = cr3;
 
@@ -372,9 +371,8 @@ int main(int argc, char *const *argv)
     }
 
     if ( json && VMI_OS_UNKNOWN != vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL) )
-    {
         vmi_get_offset(vmi, "kpgd", &kpgd);
-    } else
+    else
         vmi_init_paging(vmi, 0);
 
     triton_api.setArchitecture(ARCH_X86_64);
