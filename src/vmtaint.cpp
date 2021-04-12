@@ -375,6 +375,12 @@ int main(int argc, char *const *argv)
         return 0;
     }
 
+    if ( !pt )
+    {
+        cout << "No Processor Trace file specified (--pt)" << endl;
+        return -1;
+    }
+
     if ( json && VMI_OS_UNKNOWN != vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL) )
         vmi_get_offset(vmi, "kpgd", &kpgd);
     else
