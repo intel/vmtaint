@@ -9,7 +9,6 @@ AM_SANITY_CHECK
 
 AC_PROG_CXX(clang++)
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
-AX_CHECK_COMPILE_FLAG([-std=c++0x], [CXXFLAGS="$CXXFLAGS -std=c++0x"])
 AC_LANG(C++)
 
 AC_CHECK_HEADERS([triton/api.hpp], [], [AC_MSG_ERROR(No triton headers found)])
