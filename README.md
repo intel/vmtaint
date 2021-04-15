@@ -1,7 +1,11 @@
+# VMtaint for Xen Project*
+
+Full-VM taint analysis with Xen, Intel(R) Processor Trace and Triton.
+
 # Install dependencies:
 
 ```
-sudo apt-get install git cmake clang libboost-dev libtool automake autoconf pkg-config libipt-dev
+sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libipt-dev libcapstone-dev
 ```
 
 # Install Triton:
@@ -22,7 +26,7 @@ cd ../..
 git submodule update --init libvmi
 cd libvmi
 autoreconf -vif
-./configure --disable-kvm
+./configure --disable-kvm --disable-bareflank
 make
 sudo make install
 cd ..
@@ -41,7 +45,7 @@ make
 ```
 xl pause <domid>
 vmtaint --save-state state.log --domid <domid>
-timeout -s 2 60 xen-vmtrace <domid> 0 > vmtrace.log &
+xen-vmtrace <domid> 0 > vmtrace.log &
 xl unpause <domid>
 ```
 
@@ -82,3 +86,6 @@ ffffffffc0365032        mov rdi, -0x3fc99fbc
 ffffffffc0365039        call 0xffffffff81114873
 ffffffff81114873        nop dword ptr [rax + rax]
 ```
+
+------------
+*Other names and brands may be claimed as the property of others
