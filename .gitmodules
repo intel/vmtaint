@@ -8,3 +8,8 @@
 	url = https://github.com/libvmi/libvmi
 	shallow = true
 	ignore = dirty
+[submodule "xen"]
+	path = xen
+	url = http://xenbits.xen.org/git-http/xen.git
+	shallow = true
+	ignore = dirty
