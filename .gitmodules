@@ -10,6 +10,6 @@
 	ignore = dirty
 [submodule "xen"]
 	path = xen
-	url = http://xenbits.xen.org/git-http/xen.git
+	url = http://xenbits.xen.org/git-http/people/tklengyel/xen.git
 	shallow = true
 	ignore = dirty
