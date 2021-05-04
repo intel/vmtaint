@@ -18,3 +18,8 @@
 	url = https://github.com/aquynh/capstone
 	shallow = true
 	ignore = dirty
+[submodule "dwarf2json"]
+	path = dwarf2json
+	url = https://github.com/tklengyel/dwarf2json
+	shallow = true
+	ignore = dirty
