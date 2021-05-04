@@ -5,12 +5,24 @@ Full-VM taint analysis with Xen, Intel(R) Processor Trace and Triton.
 # Install dependencies:
 
 ```
-sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libipt-dev libcapstone-dev
+sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libipt-dev
 ```
 
 # Install Xen:
 
 Follow setup instructions from https://github.com/intel/kernel-fuzzer-for-xen-project
+
+# Install Capstone:
+
+```
+git submodule update --init capstone
+cd capstone
+mkdir build
+cd build
+cmake ..
+sudo make install
+cd ../..
+```
 
 # Install Triton:
 
