@@ -8,6 +8,10 @@ Full-VM taint analysis with Xen, Intel(R) Processor Trace and Triton.
 sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libipt-dev libcapstone-dev
 ```
 
+# Install Xen:
+
+Follow setup instructions from https://github.com/intel/kernel-fuzzer-for-xen-project
+
 # Install Triton:
 
 ```
@@ -56,15 +60,14 @@ vmtaint \
     --load-state state.log \
     --pt vmtrace.log \
     --domid <domid> \
-    --taint-address <virtual address> \
-    --taint-size <taint size> \
+    --taint-address <virtual address>:<taint size> \
     --json <kernel's debug info in json>
 ```
 
 # Example:
 
 ```
-./vmtaint --load-state state.log --domid 96 --pt vmtrace.log --json 5.4.0-48.json --taint-address 0xffffffffc0367010 --taint-size 9
+./vmtaint --load-state state.log --domid 96 --pt vmtrace.log --json 5.4.0-48.json --taint-address 0xffffffffc0367010:9
 ffffffffc0365095        movsx edi, byte ptr [rip + 0x1f74]
          Tainted reg: rdi: 0
 ffffffffc036509c        call 0xffffffffc036500b
