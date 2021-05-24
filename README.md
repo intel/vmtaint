@@ -5,7 +5,7 @@ Full-VM taint analysis with Xen, Intel(R) Processor Trace and Triton.
 # Install dependencies:
 
 ```
-sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libipt-dev
+sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config
 ```
 
 # Install Xen:
@@ -46,6 +46,19 @@ autoreconf -vif
 make
 sudo make install
 cd ..
+```
+
+# Install libipt:
+
+```
+git submodule update --init libipt
+cd libipt
+mkdir build
+cd build
+cmake .. -DPTDUMP=on
+make
+sudo make install
+cd ../..
 ```
 
 # Build vmtaint:

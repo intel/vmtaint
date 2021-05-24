@@ -23,3 +23,8 @@
 	url = https://github.com/tklengyel/dwarf2json
 	shallow = true
 	ignore = dirty
+[submodule "libipt"]
+	path = libipt
+	url = https://github.com/intel/libipt
+	shallow = true
+	ignore = dirty
