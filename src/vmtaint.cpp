@@ -21,6 +21,8 @@ static vmi_instance_t vmi;
 static addr_t kpgd;
 #define KERNEL_64 0xffffffff80000000ULL
 #define CHUNK_SIZE 10000000UL //10m
+#define STACK_MEMORY_SIZE 0x1000
+char stack_memory[STACK_MEMORY_SIZE];
 
 static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
 {
@@ -57,6 +59,23 @@ static void run_taint(addr_t ip, const unsigned char* buf, uint8_t size)
     }
 }
 
+static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
+{
+    addr_t cr3 = (kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull)) ? kpgd : asid->cr3;;
+
+    size_t read = 0;
+    ACCESS_CONTEXT(ctx);
+    ctx.tm = VMI_TM_PROCESS_DTB;
+    ctx.addr = ip;
+    ctx.dtb = cr3;
+    vmi_read(vmi, &ctx, size, buffer, &read);
+
+    if ( !read )
+        return -pte_invalid;
+
+    return read;
+}
+
 static bool save_state(const char *filepath)
 {
     registers_t regs;
@@ -69,8 +88,18 @@ static bool save_state(const char *filepath)
         return false;
 
     fwrite(&regs, sizeof(regs), 1, i);
-    fclose(i);
 
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = regs.x86.cr3;
+    ctx.addr = regs.x86.rbp - sizeof(stack_memory);
+
+    size_t sz = 0;
+    vmi_read(vmi, &ctx, sizeof(stack_memory), reinterpret_cast<uint8_t*>(stack_memory), &sz);
+
+    fwrite(stack_memory, 1, sizeof(stack_memory), i);
+
+    fclose(i);
     return true;
 }
 
@@ -84,10 +113,12 @@ static bool load_state(const char *filepath)
         return false;
 
     size_t read = fread(&regs, 1, sizeof(x86_registers_t), i);
-	fclose(i);
 
     if ( read != sizeof(x86_registers_t) )
+    {
+        fclose(i);
         return false;
+    }
 
     triton_api.setConcreteRegisterValue(triton_api.getRegister("rax"), regs.rax);
     triton_api.setConcreteRegisterValue(triton_api.getRegister("rbx"), regs.rbx);
@@ -110,25 +141,22 @@ static bool load_state(const char *filepath)
     triton_api.setConcreteRegisterValue(triton_api.getRegister("fs"), regs.fs_base);
     triton_api.setConcreteRegisterValue(triton_api.getRegister("gs"), regs.fs_base);
 
+    read = fread(stack_memory, 1, sizeof(stack_memory), i);
+
+    if( read != sizeof(stack_memory) )
+    {
+        fclose(i);
+        return false;
+    }
+
+    addr_t index = 0;
+    for ( addr_t addr = regs.rbp - sizeof(stack_memory); addr < regs.rbp; addr++)
+    {
+        triton_api.setConcreteMemoryValue(addr, stack_memory[index++]);
+    }
+
+    fclose(i);
     return true;
-}
-
-static int read_mem(uint8_t *buffer, size_t size, const struct pt_asid *asid, uint64_t ip, void *context)
-{
-    addr_t cr3 = (kpgd && (ip >= KERNEL_64 || asid->cr3 == ~0ull)) ? kpgd : asid->cr3;;
-
-    size_t read = 0;
-    ACCESS_CONTEXT(ctx);
-    ctx.tm = VMI_TM_PROCESS_DTB;
-    ctx.addr = ip;
-    ctx.dtb = cr3;
-
-    vmi_read(vmi, &ctx, size, buffer, &read);
-
-    if ( !read )
-        return -pte_invalid;
-
-    return read;
 }
 
 static bool process_pt_chunk(struct pt_config *config, struct pt_image *image, bool skip_userspace)
@@ -367,14 +395,6 @@ int main(int argc, char *const *argv)
     if ( VMI_FAILURE == vmi_init(&vmi, VMI_XEN, &domid, VMI_INIT_DOMAINID, NULL, NULL) )
         return -1;
 
-    if ( save )
-    {
-        cout << "Saving state" << endl;
-        save_state(statefile);
-        vmi_destroy(vmi);
-        return 0;
-    }
-
     if ( !pt )
     {
         cout << "No Processor Trace file specified (--pt)" << endl;
@@ -385,6 +405,14 @@ int main(int argc, char *const *argv)
         vmi_get_offset(vmi, "kpgd", &kpgd);
     else
         vmi_init_paging(vmi, 0);
+
+    if ( save )
+    {
+        cout << "Saving state" << endl;
+        save_state(statefile);
+        vmi_destroy(vmi);
+        return 0;
+    }
 
     triton_api.setArchitecture(ARCH_X86_64);
     triton_api.enableTaintEngine(1);
