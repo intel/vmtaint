@@ -395,12 +395,6 @@ int main(int argc, char *const *argv)
     if ( VMI_FAILURE == vmi_init(&vmi, VMI_XEN, &domid, VMI_INIT_DOMAINID, NULL, NULL) )
         return -1;
 
-    if ( !pt )
-    {
-        cout << "No Processor Trace file specified (--pt)" << endl;
-        return -1;
-    }
-
     if ( json && VMI_OS_UNKNOWN != vmi_init_os(vmi, VMI_CONFIG_JSON_PATH, (void*)json, NULL) )
         vmi_get_offset(vmi, "kpgd", &kpgd);
     else
@@ -412,6 +406,12 @@ int main(int argc, char *const *argv)
         save_state(statefile);
         vmi_destroy(vmi);
         return 0;
+    }
+
+    if ( !pt )
+    {
+        cout << "No Processor Trace file specified (--pt)" << endl;
+        return -1;
     }
 
     triton_api.setArchitecture(ARCH_X86_64);
