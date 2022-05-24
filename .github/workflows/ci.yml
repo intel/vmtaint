@@ -121,6 +121,11 @@ jobs:
           make -j2
           make install
 
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+
       - name: Install dwarf2json
         if: github.ref == 'refs/heads/main'
         run: |
