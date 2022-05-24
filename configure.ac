@@ -13,11 +13,11 @@ AC_LANG(C++)
 
 AC_CHECK_HEADERS([triton/api.hpp], [], [AC_MSG_ERROR(No triton headers found)])
 
-LDFLAGS="$LDFALGS -ltriton"
+LIBS="-ltriton $LIBS"
 AC_LINK_IFELSE(
 	[AC_LANG_PROGRAM([#include <triton/api.hpp>
-                      using namespace triton;],
-                     [triton::API api])], [],
+                      using namespace triton;], [triton::API api])],
+        [],
         [AC_MSG_ERROR(No triton library found)]
 )
 

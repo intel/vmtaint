@@ -5,7 +5,7 @@ Full-VM taint analysis with Xen, Intel(R) Processor Trace and Triton.
 # Install dependencies:
 
 ```
-sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libstdc++-10-dev
+sudo apt-get install build-essential git cmake libboost-dev libtool automake autoconf pkg-config libstdc++-10-dev libz3-dev
 ```
 
 # Install Xen:
